@@ -71,10 +71,7 @@ fn resolve_args(args: Args) -> Result<RuntimeArgs> {
 }
 
 fn run_once(args: &RuntimeArgs, show_disk: bool) -> Result<()> {
-    let payload = match args.provider.as_str() {
-        "ccusage" => stats::fetch_stats_ccusage()?,
-        _ => stats::fetch_stats()?,
-    };
+    let payload = stats::fetch(&args.provider)?;
     let stats_img = render::render_bars(&payload)?;
 
     if let Some(path) = &args.output {

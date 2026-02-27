@@ -30,11 +30,12 @@ fn upload_file(
     match resp {
         Ok(_) => {}
         Err(e) => {
-            let msg = e.to_string();
-            if msg.contains("Duplicate Content-Length")
+            let msg = format!("{e:?}");
+            if msg.contains("ContentLength")
+                || msg.contains("content-length")
                 || msg.contains("Data after")
-                || msg.contains("invalid content-length")
             {
+                // Device firmware sends malformed HTTP headers; upload succeeded despite the error
             } else {
                 return Err(e).context("upload failed");
             }
