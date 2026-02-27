@@ -49,20 +49,25 @@ fn make_client() -> Result<reqwest::blocking::Client> {
         .build()?)
 }
 
-pub fn upload_and_display(host: &str, img: &RgbaImage) -> Result<()> {
+pub fn upload_and_display(host: &str, filename: &str, img: &RgbaImage) -> Result<()> {
     let base = format!("http://{host}");
     let client = make_client()?;
 
-    upload_file(&client, &base, "stats.jpg", encode_jpeg(img)?)?;
+    upload_file(&client, &base, filename, encode_jpeg(img)?)?;
 
     client
         .get(format!("{base}/set?theme=3"))
         .send()
         .context("failed to set theme")?;
     client
-        .get(format!("{base}/set?img=/image//stats.jpg"))
+        .get(format!("{base}/set?img=/image//{filename}"))
         .send()
         .context("failed to set image")?;
+    // Disable autoplay so only our image shows (device has undeletable preloaded images)
+    client
+        .get(format!("{base}/set?autoplay=0"))
+        .send()
+        .context("failed to disable autoplay")?;
 
     Ok(())
 }

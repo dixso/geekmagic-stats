@@ -16,6 +16,10 @@ struct Args {
     #[arg(long)]
     host: Option<String>,
 
+    /// Stats data provider: "lib" (claude-code-stats crate) or "ccusage" (native)
+    #[arg(long)]
+    provider: Option<String>,
+
     /// Path to config file
     #[arg(long)]
     config: Option<String>,
@@ -36,6 +40,7 @@ struct Args {
 #[derive(Clone)]
 struct RuntimeArgs {
     host: String,
+    provider: String,
     output: Option<String>,
     daemon: Option<u64>,
     with_disk: bool,
@@ -47,9 +52,14 @@ fn resolve_args(args: Args) -> Result<RuntimeArgs> {
         .host
         .or(cfg.host)
         .ok_or_else(|| anyhow!("missing host; pass --host or set host in config"))?;
+    let provider = args
+        .provider
+        .or(cfg.provider)
+        .unwrap_or_else(|| "lib".to_string());
 
     Ok(RuntimeArgs {
         host,
+        provider,
         output: args.output,
         daemon: args.daemon.or(cfg.daemon),
         with_disk: if args.with_disk {
@@ -60,8 +70,11 @@ fn resolve_args(args: Args) -> Result<RuntimeArgs> {
     })
 }
 
-fn run_once(args: &RuntimeArgs) -> Result<()> {
-    let payload = stats::fetch_stats()?;
+fn run_once(args: &RuntimeArgs, show_disk: bool) -> Result<()> {
+    let payload = match args.provider.as_str() {
+        "ccusage" => stats::fetch_stats_ccusage()?,
+        _ => stats::fetch_stats()?,
+    };
     let stats_img = render::render_bars(&payload)?;
 
     if let Some(path) = &args.output {
@@ -70,20 +83,16 @@ fn run_once(args: &RuntimeArgs) -> Result<()> {
         return Ok(());
     }
 
-    if args.with_disk {
+    if args.with_disk && show_disk {
         let disk_info = disk_render::get_disk_info()?;
         let disk_img = disk_render::render_disk(&disk_info)?;
-
-        geekmagic_common::upload::upload_album(
-            &args.host,
-            &[("stats.jpg", &stats_img), ("disk.jpg", &disk_img)],
-        )?;
+        geekmagic_common::upload::upload_and_display(&args.host, "disk.jpg", &disk_img)?;
         let now = chrono::Local::now().format("%H:%M:%S");
-        println!("[{now}] Pushed stats + disk to {}", args.host);
+        println!("[{now}] Pushed disk to {}", args.host);
     } else {
-        geekmagic_common::upload::upload_and_display(&args.host, &stats_img)?;
+        geekmagic_common::upload::upload_and_display(&args.host, "stats.jpg", &stats_img)?;
         let now = chrono::Local::now().format("%H:%M:%S");
-        println!("[{now}] Pushed to {}", args.host);
+        println!("[{now}] Pushed stats to {}", args.host);
     }
 
     Ok(())
@@ -95,14 +104,17 @@ fn main() -> Result<()> {
     if let Some(interval) = args.daemon {
         let interval = interval.max(10);
         println!("Daemon mode: pushing every {interval}s to {}", args.host);
+        let mut cycle: u64 = 0;
         loop {
-            if let Err(e) = run_once(&args) {
+            let show_disk = args.with_disk && cycle % 2 == 1;
+            if let Err(e) = run_once(&args, show_disk) {
                 let now = chrono::Local::now().format("%H:%M:%S");
                 eprintln!("[{now}] Error: {e}");
             }
+            cycle = cycle.wrapping_add(1);
             thread::sleep(Duration::from_secs(interval));
         }
     } else {
-        run_once(&args)
+        run_once(&args, false)
     }
 }

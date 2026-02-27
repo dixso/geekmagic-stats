@@ -40,7 +40,7 @@ fn main() -> Result<()> {
         img.save(path)?;
         println!("Saved to {path}");
     } else {
-        geekmagic_common::upload::upload_and_display(&host, &img)?;
+        geekmagic_common::upload::upload_and_display(&host, "disk.jpg", &img)?;
         println!("Pushed to {host}");
     }
 
