@@ -1,3 +1,5 @@
+mod ccusage;
+#[cfg(feature = "claude-code-stats-provider")]
 mod lib_provider;
 
 use anyhow::{anyhow, Result};
@@ -28,6 +30,8 @@ pub struct PaceInfo {
 
 pub fn fetch(provider: &str) -> Result<ActiveData> {
     match provider {
+        "ccusage" => ccusage::fetch(),
+        #[cfg(feature = "claude-code-stats-provider")]
         "lib" => lib_provider::fetch(),
         other => Err(anyhow!("unknown provider: {other}")),
     }
