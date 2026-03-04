@@ -61,7 +61,7 @@ fn resolve_args(args: Args) -> Result<RuntimeArgs> {
 }
 
 fn run_once(args: &RuntimeArgs) -> Result<()> {
-    let payload = stats::fetch_stats()?;
+    let payload = stats::fetch("lib")?;
     let stats_img = render::render_bars(&payload)?;
 
     if let Some(path) = &args.output {
